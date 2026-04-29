@@ -3,44 +3,46 @@ import re
 import random
 import urllib.parse
 
-st.set_page_config(page_title="Movie Explorer", page_icon="🕵️‍♀️")
-st.title("🕵️‍♀️ Movie Explorer: Najdi něco nového")
+# Nastavení vzhledu stránky
+st.set_page_config(page_title="Movie Picker", page_icon="🎬")
 
-text = st.text_area("Vlož zdrojový kód (Ctrl+U):", height=150)
+st.title("🎬 Movie Picker")
+st.markdown("Vlož zdrojový kód tvých hodnocení z ČSFD a já ti vyberu film na večer.")
 
-if text:
-    # Hledáme název a ID filmu (např. /film/10134-rivalove/)
-    pattern = r'href="(/film/(.+?)/)".+?class="film-title-name">(.+?)<\/a>.*?class="stars stars-([45])"'
-    data = re.findall(pattern, text, re.DOTALL)
+# Vstupní pole pro kód (Ctrl+U -> Ctrl+A -> Ctrl+C)
+html_input = st.text_area("Sem vlož kód (Ctrl+U):", height=200, placeholder="Pravým na ČSFD -> Zobrazit zdrojový kód stránky...")
+
+if html_input:
+    # Regex hledá název filmu a informaci o tom, zda má 4 nebo 5 hvězd
+    # Hvězdičky na ČSFD jsou v kódu jako 'stars-4' nebo 'stars-5'
+    pattern = r'class="film-title-name">(.+?)<\/a>.*?class="stars stars-([45])"'
+    found_data = re.findall(pattern, html_input, re.DOTALL)
     
-    filmy = []
-    for link, slug, title, stars in data:
-        t_clean = title.strip()
-        if not any(x in t_clean.lower() for x in ["epizoda", "pořad", "série", "seriál"]):
-            filmy.append((t_clean, link, slug))
+    # Filtrace: Chceme jen čisté názvy filmů a vyhazujeme balast (epizody, pořady)
+    final_movies = []
+    for title, stars in found_data:
+        clean_title = title.strip()
+        # Seznam slov, která nechceme v názvu (odfiltruje seriály a Jirku)
+        if not any(word in clean_title.lower() for word in ["epizoda", "pořad", "série", "seriál", "vysvětluje věci"]):
+            final_movies.append(clean_title)
 
-    if filmy:
-        vysledek_nazev, vysledek_cesta, slug = random.choice(filmy)
+    if final_movies:
+        # Náhodný výběr jednoho filmu
+        selected_movie = random.choice(final_movies)
         
-        st.write("---")
-        st.subheader(f"Protože se ti líbilo: **{vysledek_nazev}**")
+        st.divider()
+        st.subheader("🎯 Můj tip pro tebe:")
+        st.title(f"🍿 {selected_movie}")
         
-        col1, col2 = st.columns(2)
+        # Vytvoření bezpečného odkazu na vyhledávání na ČSFD
+        # Tím se vyhneme chybě 404 (Upsy-daisy)
+        search_url = f"https://www.csfd.cz/vyhledavani/?q={urllib.parse.quote(selected_movie)}"
         
-        with col1:
-            # Odkaz přímo na podobné filmy na ČSFD (sekce Podobné)
-            sim_link = f"https://www.csfd.cz{vysledek_cesta}podobne/"
-            st.link_button("✨ Ukázat PODOBNÉ na ČSFD", sim_link, width='stretch')
-            
-        with col2:
-            # Odkaz na Google vyhledávání tipů
-            google_search = urllib.parse.quote(f"movies similar to {vysledek_nazev} reddit")
-            st.link_button("🔍 Hledat tipy na Redditu/Google", f"https://www.google.com/search?q={google_search}", width='stretch')
-            
-        st.write("---")
-        st.info("💡 **Tip:** Na ČSFD stránce 'Podobné' uvidíš filmy, které systém doporučuje k tvému oblíbenci. Tam najdeš ty novinky!")
-
+        st.link_button(f"🔍 Najít '{selected_movie}' na ČSFD", search_url)
+        
+        st.caption(f"Vybíral jsem z {len(final_movies)} tvých oblíbených filmů na této stránce.")
+        st.divider()
     else:
-        st.warning("V kódu nejsou žádné filmy se 4-5*. Zkus jinou stránku tvých hodnocení.")
+        st.error("V tomto kódu jsem nenašel žádné FILMY se 4 nebo 5 hvězdami. Ujisti se, že kopíruješ zdrojový kód (Ctrl+U).")
 else:
-    st.write("Vlož kód a já ti pomůžu najít něco, co jsi ještě neviděla.")
+    st.info("💡 **Nápověda:** Jdi na ČSFD na svá hodnocení, dej **Ctrl+U**, pak všechno označ (**Ctrl+A**
