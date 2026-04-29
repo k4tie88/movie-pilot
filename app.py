@@ -2,29 +2,31 @@ import streamlit as st
 import re
 import random
 
-# Jednoduché nastavení
 st.title("🎬 Movie Picker")
 
-# Vstupní pole
-html_input = st.text_area("Vlož kód a dej Ctrl+Enter:")
+# Vstupní pole bez zbytečností
+html_input = st.text_area("Vlož kód a stiskni Ctrl+Enter:", height=200)
 
 if html_input:
-    # Extrakce názvů filmů (hledáme cokoli s 4* nebo 5*)
+    # Hledáme názvy u 4* a 5* (včetně ošetření speciálních znaků)
     data = re.findall(r'class="film-title-name">(.+?)<\/a>.*?class="stars stars-([45])"', html_input, re.DOTALL)
     
-    # Filtrujeme jen čisté názvy, vynecháme seriálové věci
+    # Filtrace: pouze filmy (vynecháme balast)
     filmy = []
     for t, s in data:
-        if "epizoda" not in t.lower() and "pořad" not in t.lower() and "série" not in t.lower():
-            filmy.append(t)
+        t_clean = t.strip()
+        if not any(x in t_clean.lower() for x in ["epizoda", "pořad", "série", "seriál"]):
+            filmy.append(t_clean)
 
     if filmy:
         vysledek = random.choice(filmy)
         st.write("---")
-        # Tohle vypíše pouze čistý název filmu
-        st.success(f"## {vysledek}")
+        st.subheader("Tvůj tip na film:")
+        # Obří text, aby nešel přehlédnout
+        st.title(f"🍿 {vysledek}")
         st.write("---")
+        st.write(f"Vybíral jsem z celkem {len(filmy)} tvých oblíbených filmů.")
     else:
-        st.error("V tomto kódu jsem žádné 4* nebo 5* filmy nenašel.")
+        st.warning("V tomhle textu jsem nenašel žádné filmy se 4 nebo 5 hvězdami.")
 else:
-    st.info("Čekám na vložení textu...")
+    st.info("Aplikace je připravena. Vlož kód z ČSFD a potvrď ho.")
