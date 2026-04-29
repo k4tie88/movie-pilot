@@ -1,58 +1,53 @@
 import streamlit as st
-import requests
-from bs4 import BeautifulSoup
+import re
+import pandas as pd
 import random
 
-st.set_page_config(page_title="MovieRoute 🎬", page_icon="🍿")
-st.title("🎬 MovieRoute")
+st.set_page_config(page_title="MovieRoute AI 🧠", page_icon="🎬")
+st.title("🧠 MovieRoute: Podle tvého hodnocení")
 
-USER_ID = "889226"
+st.info("Tento nástroj najde tvoje 5* pecky i bez ručního přepisování!")
 
-@st.cache_data(ttl=3600)  # Seznam si zapamatuje na hodinu, aby neprovokoval ČSFD
-def get_watchlist(user_id):
-    url = f"https://www.csfd.cz/uzivatel/{user_id}/chci-videt/"
+with st.expander("Návod: Jak sem dostat svoje hodnocení?"):
+    st.write("1. Otevři svůj profil na ČSFD (sekce Hodnocení).")
+    st.write("2. Zmáčkni **Ctrl+U** (otevře se kód stránky).")
+    st.write("3. Zmáčkni **Ctrl+A** a pak **Ctrl+C**.")
+    st.write("4. Vlož to do pole níže.")
+
+# Okno pro vložení zdrojového kódu
+html_input = st.text_area("Vlož zdrojový kód z ČSFD sem:", height=200)
+
+if html_input:
+    # REGEX MAGIE: Hledáme názvy filmů a k nim přiřazené hvězdičky v kódu ČSFD
+    # ČSFD v kódu používá třídy jako "stars-5" nebo "rating-5"
+    pattern = r'class="film-title-name">(.+?)<\/a>.*?class="stars-(\d)"'
+    found_data = re.findall(pattern, html_input, re.DOTALL)
     
-    # Rozšířené hlavičky, které věrně simulují prohlížeč
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-        "Accept-Language": "cs-CZ,cs;q=0.9,en;q=0.8",
-        "Referer": "https://www.google.com/",
-        "DNT": "1"
-    }
-    
-    try:
-        response = requests.get(url, headers=headers, timeout=10)
-        if response.status_code != 200:
-            return None
+    if found_data:
+        df = pd.DataFrame(found_data, columns=['Film', 'Hvězdy'])
+        df['Hvězdy'] = df['Hvězdy'].astype(int)
         
-        soup = BeautifulSoup(response.text, 'html.parser')
-        movies = []
+        # Filtrujeme jen tvoje srdcovky (4 a 5 hvězd)
+        top_movies = df[df['Hvězdy'] >= 4].copy()
         
-        # Nový selektor pro názvy filmů na ČSFD
-        for link in soup.select('a.film-title-name'):
-            title = link.text.strip()
-            path = link.get('href')
-            movies.append({
-                'title': title,
-                'url': f"https://www.csfd.cz{path}"
-            })
-        return movies
-    except:
-        return None
-
-st.write(f"Načítám tvůj 'Chci vidět' seznam pro uživatele: **katie88**")
-
-if st.button("🎲 Vyber mi film na večer"):
-    with st.spinner("Zkouším se nenápadně podívat na ČSFD..."):
-        watchlist = get_watchlist(USER_ID)
+        st.success(f"Načteno! Vidím {len(df)} ohodnocených filmů. Z toho {len(top_movies)} jsou tvoje TOP kousky (4-5*).")
         
-    if watchlist and len(watchlist) > 0:
-        film = random.choice(watchlist)
-        st.balloons()
-        st.divider()
-        st.subheader(f"🍿 {film['title']}")
-        st.link_button("Otevřít film na ČSFD ↗", film['url'])
+        if st.button("🎲 Doporuč mi něco na základě mých TOP filmů"):
+            seed_movie = random.choice(top_movies['Film'].tolist())
+            st.divider()
+            st.write(f"Vycházím z tvého oblíbeného filmu: **{seed_movie}**")
+            
+            # Tady propojíme s vyhledáváním podobných věcí
+            st.subheader("Zkus se mrknout na tyhle podobné kousky:")
+            
+            # Vygenerujeme odkazy na Google/YouTube pro doporučení
+            col1, col2 = st.columns(2)
+            with col1:
+                st.link_button(f"Podobné jako {seed_movie} (Google)", f"https://www.google.com/search?q=filmy+podobné+jako+{seed_movie.replace(' ', '+')}")
+            with col2:
+                st.link_button("Hledat na ČSFD", f"https://www.csfd.cz/hledat/?q={seed_movie.replace(' ', '+')}")
     else:
-        st.error("ČSFD nás stále blokuje. 🛑")
-        st.info("Zkus aplikaci restartovat (vpravo nahoře v menu 'Clear cache' nebo 'Rerun'). Pokud to nepomůže, ČSFD dočasně zablokovalo adresu, na které běží Streamlit.")
+        st.warning("V tomhle textu jsem žádná hodnocení nenašel. Ujisti se, že kopíruješ kód (Ctrl+U) ze stránky s hodnocením.")
+
+else:
+    st.info("Čekám na tvůj vložený kód ze stránky Hodnocení...")
