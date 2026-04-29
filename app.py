@@ -1,51 +1,36 @@
 import streamlit as st
 import re
-import pandas as pd
 import random
 
-st.set_page_config(page_title="MovieRoute AI 🧠", page_icon="🎬")
-st.title("🎬 MovieRoute: Katie88 Edition")
+st.set_page_config(page_title="MovieRoute", page_icon="🍿")
+st.title("🍿 Movie Picker")
 
-st.markdown("""
-Vlož do pole níže ten text, co jsi mi poslala (celý ten blok začínající `table class...`).
-""")
-
-html_input = st.text_area("Vlož zdrojový kód sem:", height=300)
+html_input = st.text_area("Vlož kód z ČSFD:", height=150)
 
 if html_input:
-    # Upravený regulární výraz přímo pro ČSFD tabulku
-    # Hledá název filmu a počet hvězdiček nebo "odpad!"
-    pattern = r'class="film-title-name">(.+?)<\/a>.*?class="stars (?:stars-(\d)|(trash))"'
+    # Najde filmy, které mají 4 nebo 5 hvězdiček
+    # Ignoruje epizody a pořady, aby tam neskákal Jirka nebo Bridgertonovi
+    pattern = r'class="film-title-name">(.+?)<\/a>.*?<span class="info">.*?(\d{4}).*?(?:<span class="info">(.*?)<\/span>)?.*?class="stars stars-([45])"'
     found_data = re.findall(pattern, html_input, re.DOTALL)
     
-    parsed_movies = []
-    for title, stars, trash in found_data:
-        rating = 0 if trash else int(stars)
-        parsed_movies.append({"Film": title, "Hvězdy": rating})
+    # Vyfiltrujeme jen ty, co v doplňujícím info nemají "epizoda", "pořad" atd.
+    top_movies = []
+    for title, year, info, stars in found_data:
+        if not any(x in str(info).lower() for x in ['epizoda', 'pořad', 'série', 'záznam']):
+            top_movies.append(title)
 
-    if parsed_movies:
-        df = pd.DataFrame(parsed_movies)
-        st.success(f"✅ Úspěch! Načetl jsem {len(df)} tvých hodnocení.")
+    if top_movies:
+        st.write(f"Vybírám z tvých {len(top_movies)} nejlepších filmů...")
         
-        # Zobrazení statistik
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("Průměrné hodnocení", f"{df['Hvězdy'].mean():.1f} / 5")
-        with col2:
-            top_count = len(df[df['Hvězdy'] >= 4])
-            st.metric("Srdcovky (4-5*)", top_count)
-
-        st.dataframe(df, use_container_width=True)
-        
-        # Doporučovací algoritmus "Katie-Logic"
-        st.divider()
-        st.subheader("🤖 AI doporučení na večer")
-        
-        if st.button("Vygenerovat tip podle mého vkusu"):
-            favorites = df[df['Hvězdy'] >= 4]['Film'].tolist()
-            if favorites:
-                tip = random.choice(favorites)
-                st.balloons()
-                st.info(f"Dneska bys mohla dát něco v podobném duchu jako: **{tip}**")
+        if st.button("CO SI MÁM PUSTIT?"):
+            vybrany_film = random.choice(top_movies)
+            
+            # Velký, jasný výsledek bez zbytečných řečí
+            st.markdown(f"""
+            ---
+            ### 🎬 Dneska koukej na:
+            # **{vybrany_film}**
+            ---
+            """)
     else:
-        st.error("Chyba: V tomhle textu jsem nenašel žádné filmy. Zkus zkopírovat ten velký blok znovu.")
+        st.warning("V tomhle textu jsem nenašel žádné FILMY se 4-5 hvězdami. Zkus zkopírovat větší kus stránky.")
