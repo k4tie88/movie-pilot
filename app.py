@@ -1,5 +1,4 @@
 import streamlit as st
-import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 import random
@@ -7,47 +6,53 @@ import random
 st.set_page_config(page_title="MovieRoute 🎬", page_icon="🍿")
 st.title("🎬 MovieRoute")
 
-# ID tvého profilu z odkazu
 USER_ID = "889226"
 
+@st.cache_data(ttl=3600)  # Seznam si zapamatuje na hodinu, aby neprovokoval ČSFD
 def get_watchlist(user_id):
-    # Tohle je adresa tvého seznamu "Chci vidět"
     url = f"https://www.csfd.cz/uzivatel/{user_id}/chci-videt/"
     
-    # ČSFD vyžaduje "User-Agent", aby si nemyslelo, že jsme zlý robot
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"}
+    # Rozšířené hlavičky, které věrně simulují prohlížeč
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+        "Accept-Language": "cs-CZ,cs;q=0.9,en;q=0.8",
+        "Referer": "https://www.google.com/",
+        "DNT": "1"
+    }
     
-    response = requests.get(url, headers=headers)
-    if response.status_code != 200:
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        if response.status_code != 200:
+            return None
+        
+        soup = BeautifulSoup(response.text, 'html.parser')
+        movies = []
+        
+        # Nový selektor pro názvy filmů na ČSFD
+        for link in soup.select('a.film-title-name'):
+            title = link.text.strip()
+            path = link.get('href')
+            movies.append({
+                'title': title,
+                'url': f"https://www.csfd.cz{path}"
+            })
+        return movies
+    except:
         return None
-    
-    soup = BeautifulSoup(response.text, 'html.parser')
-    
-    # Najdeme všechny filmy v seznamu
-    movies = []
-    # ČSFD používá pro názvy filmů třídu 'film-title-name'
-    for link in soup.select('.film-title-name'):
-        title = link.text.strip()
-        path = link.get('href')
-        movies.append({
-            'title': title,
-            'url': f"https://www.csfd.cz{path}"
-        })
-    return movies
 
 st.write(f"Načítám tvůj 'Chci vidět' seznam pro uživatele: **katie88**")
 
 if st.button("🎲 Vyber mi film na večer"):
-    with st.spinner("Slídím na ČSFD..."):
+    with st.spinner("Zkouším se nenápadně podívat na ČSFD..."):
         watchlist = get_watchlist(USER_ID)
         
-    if watchlist:
+    if watchlist and len(watchlist) > 0:
         film = random.choice(watchlist)
         st.balloons()
         st.divider()
         st.subheader(f"🍿 {film['title']}")
-        st.link_button("Kouknout na ČSFD ↗", film['url'])
+        st.link_button("Otevřít film na ČSFD ↗", film['url'])
     else:
-        st.error("Nepodařilo se načíst tvůj seznam. ČSFD nás možná na chvíli zablokovalo, zkus to za moment.")
-
-st.info("Poznámka: Tento scraper zatím bere jen první stránku tvého seznamu. Pokud jich chceš víc, museli bychom to nechat 'prolézat' déle.")
+        st.error("ČSFD nás stále blokuje. 🛑")
+        st.info("Zkus aplikaci restartovat (vpravo nahoře v menu 'Clear cache' nebo 'Rerun'). Pokud to nepomůže, ČSFD dočasně zablokovalo adresu, na které běží Streamlit.")
