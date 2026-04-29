@@ -2,35 +2,44 @@ import streamlit as st
 import re
 import random
 
-st.set_page_config(page_title="MovieRoute", page_icon="🍿")
-st.title("🍿 Movie Picker (Fast Mode)")
+# Základní konfigurace stránky
+st.set_page_config(page_title="MovieRoute", page_icon="🎬")
 
-# Textové pole - po stisknutí Ctrl+Enter se stránka celá znovu načte a kód se spustí
-html_input = st.text_area("Vlož kód z ČSFD a stiskni Ctrl+Enter:", height=150)
+st.title("🎬 Movie Picker")
 
+# 1. Vstupní pole
+html_input = st.text_area("Vlož kód a stiskni Ctrl+Enter:", height=150, placeholder="Sem vlož ten zkopírovaný text...")
+
+# 2. Logika zpracování (běží automaticky po Ctrl+Enter)
 if html_input:
-    # 1. Najdeme filmy se 4-5 hvězdami
+    # Regex hledá název filmu a hvězdičky 4 nebo 5
+    # Bere v úvahu tvou tabulku z ČSFD
     pattern = r'class="film-title-name">(.+?)<\/a>.*?<span class="info">.*?(\d{4}).*?(?:<span class="info">(.*?)<\/span>)?.*?class="stars stars-([45])"'
     found_data = re.findall(pattern, html_input, re.DOTALL)
     
-    # 2. Vyfiltrujeme balast (epizody, pořady atd.)
-    clean_movies = []
-    for title, year, info, stars in found_data:
-        if not any(x in str(info).lower() for x in ['epizoda', 'série', 'pořad', 'záznam', 'seriál']):
-            clean_movies.append(title)
+    # Filtrace balastu
+    filmy = []
+    for t, y, info, s in found_data:
+        infostr = str(info).lower()
+        if "epizoda" not in infostr and "pořad" not in infostr and "série" not in infostr:
+            filmy.append(t)
 
-    # 3. Pokud máme seznam, hned jeden vybereme
-    if clean_movies:
-        vybrany_film = random.choice(clean_movies)
+    # 3. Okamžitý výsledek
+    if filmy:
+        vyber = random.choice(filmy)
         
-        st.balloons()
         st.markdown("---")
-        st.subheader("🎬 Tvůj film na dnešek:")
-        st.code(vybrany_film, language=None) # Zobrazí název ve velkém bloku, co jde snadno kopírovat
+        st.success("Filmy načteny! Tvůj tip na večer:")
+        
+        # Obří nápis bez zbytečných řečí
+        st.write(f"## 🏆 {vyber}")
+        
         st.markdown("---")
         
-        # Pro jistotu vypíšeme i zbytek, abys viděla, z čeho se vybíralo
-        with st.expander("Zobrazit všechny nalezené filmy"):
-            st.write(", ".join(clean_movies))
+        # Malá pojistka - seznam všech nalezených pro kontrolu
+        with st.expander("Seznam všech tvých 4-5* filmů"):
+            st.write(", ".join(filmy))
     else:
-        st.error("Žádné filmy se 4-5* nebyly nalezeny. Zkus zkontrolovat, jestli jsi vložila správný kód.")
+        st.warning("Vložený text neobsahuje žádné FILMY se 4-5 hvězdami. Zkus to znovu.")
+else:
+    st.info("Čekám na vložení kódu...")
