@@ -4,50 +4,48 @@ import pandas as pd
 import random
 
 st.set_page_config(page_title="MovieRoute AI 🧠", page_icon="🎬")
-st.title("🧠 MovieRoute: Podle tvého hodnocení")
+st.title("🎬 MovieRoute: Katie88 Edition")
 
-st.info("Tento nástroj najde tvoje 5* pecky i bez ručního přepisování!")
+st.markdown("""
+Vlož do pole níže ten text, co jsi mi poslala (celý ten blok začínající `table class...`).
+""")
 
-with st.expander("Návod: Jak sem dostat svoje hodnocení?"):
-    st.write("1. Otevři svůj profil na ČSFD (sekce Hodnocení).")
-    st.write("2. Zmáčkni **Ctrl+U** (otevře se kód stránky).")
-    st.write("3. Zmáčkni **Ctrl+A** a pak **Ctrl+C**.")
-    st.write("4. Vlož to do pole níže.")
-
-# Okno pro vložení zdrojového kódu
-html_input = st.text_area("Vlož zdrojový kód z ČSFD sem:", height=200)
+html_input = st.text_area("Vlož zdrojový kód sem:", height=300)
 
 if html_input:
-    # REGEX MAGIE: Hledáme názvy filmů a k nim přiřazené hvězdičky v kódu ČSFD
-    # ČSFD v kódu používá třídy jako "stars-5" nebo "rating-5"
-    pattern = r'class="film-title-name">(.+?)<\/a>.*?class="stars-(\d)"'
+    # Upravený regulární výraz přímo pro ČSFD tabulku
+    # Hledá název filmu a počet hvězdiček nebo "odpad!"
+    pattern = r'class="film-title-name">(.+?)<\/a>.*?class="stars (?:stars-(\d)|(trash))"'
     found_data = re.findall(pattern, html_input, re.DOTALL)
     
-    if found_data:
-        df = pd.DataFrame(found_data, columns=['Film', 'Hvězdy'])
-        df['Hvězdy'] = df['Hvězdy'].astype(int)
-        
-        # Filtrujeme jen tvoje srdcovky (4 a 5 hvězd)
-        top_movies = df[df['Hvězdy'] >= 4].copy()
-        
-        st.success(f"Načteno! Vidím {len(df)} ohodnocených filmů. Z toho {len(top_movies)} jsou tvoje TOP kousky (4-5*).")
-        
-        if st.button("🎲 Doporuč mi něco na základě mých TOP filmů"):
-            seed_movie = random.choice(top_movies['Film'].tolist())
-            st.divider()
-            st.write(f"Vycházím z tvého oblíbeného filmu: **{seed_movie}**")
-            
-            # Tady propojíme s vyhledáváním podobných věcí
-            st.subheader("Zkus se mrknout na tyhle podobné kousky:")
-            
-            # Vygenerujeme odkazy na Google/YouTube pro doporučení
-            col1, col2 = st.columns(2)
-            with col1:
-                st.link_button(f"Podobné jako {seed_movie} (Google)", f"https://www.google.com/search?q=filmy+podobné+jako+{seed_movie.replace(' ', '+')}")
-            with col2:
-                st.link_button("Hledat na ČSFD", f"https://www.csfd.cz/hledat/?q={seed_movie.replace(' ', '+')}")
-    else:
-        st.warning("V tomhle textu jsem žádná hodnocení nenašel. Ujisti se, že kopíruješ kód (Ctrl+U) ze stránky s hodnocením.")
+    parsed_movies = []
+    for title, stars, trash in found_data:
+        rating = 0 if trash else int(stars)
+        parsed_movies.append({"Film": title, "Hvězdy": rating})
 
-else:
-    st.info("Čekám na tvůj vložený kód ze stránky Hodnocení...")
+    if parsed_movies:
+        df = pd.DataFrame(parsed_movies)
+        st.success(f"✅ Úspěch! Načetl jsem {len(df)} tvých hodnocení.")
+        
+        # Zobrazení statistik
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Průměrné hodnocení", f"{df['Hvězdy'].mean():.1f} / 5")
+        with col2:
+            top_count = len(df[df['Hvězdy'] >= 4])
+            st.metric("Srdcovky (4-5*)", top_count)
+
+        st.dataframe(df, use_container_width=True)
+        
+        # Doporučovací algoritmus "Katie-Logic"
+        st.divider()
+        st.subheader("🤖 AI doporučení na večer")
+        
+        if st.button("Vygenerovat tip podle mého vkusu"):
+            favorites = df[df['Hvězdy'] >= 4]['Film'].tolist()
+            if favorites:
+                tip = random.choice(favorites)
+                st.balloons()
+                st.info(f"Dneska bys mohla dát něco v podobném duchu jako: **{tip}**")
+    else:
+        st.error("Chyba: V tomhle textu jsem nenašel žádné filmy. Zkus zkopírovat ten velký blok znovu.")
