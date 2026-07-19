@@ -1,63 +1,58 @@
 import streamlit as st
-import re
+import requests
+from bs4 import BeautifulSoup
 import random
-import urllib.parse
 
-st.set_page_config(page_title="Hidden Gems Finder", page_icon="💎")
+st.set_page_config(page_title="MovieRoute 🎬", page_icon="🍿")
+st.title("🎬 MovieRoute")
 
-# --- DATABÁZE SKRYTÝCH KLENOTŮ A KVALITNÍCH MÉNĚ ZNÁMÝCH FILMŮ ---
-# Tento seznam můžeš dál rozšiřovat. Jsou tu věci, co mají úroveň, ale nejsou to "Avengers".
-HIDDEN_GEMS = [
-    "Pozemský muž", "Díra", "Co děláme v temnotách", "Sama v noci domů kráčím",
-    "Humr", "Zabití posvátného jelena", "První reformovaná", "Věčný svit neposkvrněné mysli",
-    "Ex Machina", "Pí", "Nepřítel", "Noční zvířata", "Trestanec", "Wind River",
-    "Sicario: Nájemný vrah", "Příchozí", "Slunovrat", "Čarodějnice", "Maják",
-    "Dobrý časy", "Uncut Gems", "Florida Project", "Kapitán Fantastický",
-    "Whiplash", "Vykolejená", "Sing Street", "Frank", "Musíme si promluvit o Kevinovi",
-    "Svědek", "Zmizení", "Úkryt", "Pevnost", "Pouto", "V kůži Johna Malkoviche",
-    "Adaptace", "Magnolia", "Synekdocha, New York", "Oldboy", "Viděl jsem ďábla",
-    "Zátah: Vykoupení", "Kluk od vedle", "Nikdy jsi tu nebyl", "Drive", 
-    "Neon Demon", "Pod kůží", "Anihilace", "Stoker", "Sněhurka", "Victoria",
-    "Oni", "Vstup do prázdna", "Climax", "Zvrácený", "Holy Motors", "Svišti",
-    "Incendies", "Královna", "Kód Enigmy", "Teorie všeho", "Loni v Marienbadu",
-    "Persona", "U konce s dechem", "Sedm samurajů", "Hrob světlušek", "Hon",
-    "Rozchod Nadera a Simin", "Zloději krámů", "Zlaté časy na Ridgemont High"
-]
+USER_ID = "889226"
 
-if 'shlednuto' not in st.session_state:
-    st.session_state.shlednuto = set()
-
-st.title("💎 Hledač skrytých klenotů")
-st.write("Doporučím ti kvalitní, méně známé filmy, které **nemáš v seznamu**.")
-
-# --- TVŮJ SEZNAM (Z ČSFD) ---
-with st.expander("📥 Nahrát moje viděné filmy (Ctrl+U)"):
-    html_input = st.text_area("Vlož kód z ČSFD:", height=150)
-    if st.button("Aktualizovat moji databázi"):
-        if html_input:
-            titles = re.findall(r'class="film-title-name">(.+?)<\/a>', html_input)
-            for t in titles:
-                st.session_state.shlednuto.add(t.strip())
-            st.success(f"Vím o {len(st.session_state.shlednuto)} filmech, co jsi viděla.")
-
-# --- LOGIKA DOPORUČENÍ ---
-st.divider()
-
-if st.button("🔍 NAJDI SKRYTÝ KLENOT", use_container_width=True):
-    # Najdeme ty, co v seznamu NEJSOU
-    nove_kousky = [f for f in HIDDEN_GEMS if f not in st.session_state.shlednuto]
+@st.cache_data(ttl=3600)  # Seznam si zapamatuje na hodinu, aby neprovokoval ČSFD
+def get_watchlist(user_id):
+    url = f"https://www.csfd.cz/uzivatel/{user_id}/chci-videt/"
     
-    if nove_kousky:
-        vysledek = random.choice(nove_kousky)
-        st.balloons()
-        st.markdown(f"### Tohle by tě mohlo bavit: \n# 🎥 {vysledek}")
+    # Rozšířené hlavičky, které věrně simulují prohlížeč
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+        "Accept-Language": "cs-CZ,cs;q=0.9,en;q=0.8",
+        "Referer": "https://www.google.com/",
+        "DNT": "1"
+    }
+    
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        if response.status_code != 200:
+            return None
         
-        q = urllib.parse.quote(f"{vysledek} csfd")
-        st.link_button(f"🔎 Podívat se, o čem to je (Google)", f"https://www.google.com/search?q={q}")
+        soup = BeautifulSoup(response.text, 'html.parser')
+        movies = []
         
-        st.info("Tento film je v mém seznamu doporučených, ale ve tvém seznamu viděných chybí.")
-    else:
-        st.warning("Vypadá to, že jsi viděla všechny klenoty z mého aktuálního výběru! Musím jich přidat víc.")
+        # Nový selektor pro názvy filmů na ČSFD
+        for link in soup.select('a.film-title-name'):
+            title = link.text.strip()
+            path = link.get('href')
+            movies.append({
+                'title': title,
+                'url': f"https://www.csfd.cz{path}"
+            })
+        return movies
+    except:
+        return None
 
-# Statistiky v panelu
-st.sidebar.write(f"V tvém blacklistu je: **{len(st.session_state.shlednuto)}** filmů.")
+st.write(f"Načítám tvůj 'Chci vidět' seznam pro uživatele: **katie88**")
+
+if st.button("🎲 Vyber mi film na večer"):
+    with st.spinner("Zkouším se nenápadně podívat na ČSFD..."):
+        watchlist = get_watchlist(USER_ID)
+        
+    if watchlist and len(watchlist) > 0:
+        film = random.choice(watchlist)
+        st.balloons()
+        st.divider()
+        st.subheader(f"🍿 {film['title']}")
+        st.link_button("Otevřít film na ČSFD ↗", film['url'])
+    else:
+        st.error("ČSFD nás stále blokuje. 🛑")
+        st.info("Zkus aplikaci restartovat (vpravo nahoře v menu 'Clear cache' nebo 'Rerun'). Pokud to nepomůže, ČSFD dočasně zablokovalo adresu, na které běží Streamlit.")
